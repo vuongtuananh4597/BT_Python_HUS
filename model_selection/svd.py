@@ -2,7 +2,7 @@ import numpy as np
 
 
 class SVD(object):
-    """Matrix factorization based on funkSVD
+    """Matrix factorization based on funkSVD (numpy ver.)
 
     Params:
      - K : number of latent factors
