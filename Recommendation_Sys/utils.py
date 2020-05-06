@@ -1,29 +1,22 @@
-import numpy as np
+import numpy
 
 
-def train_test_split(x, train_ratio, base=None):
-    """Batch generator
-    Params :
-     - x : input matrix
-     - ratio : split_ratio
-    Outputs :
-     - matrix (batch_size, :)
+def train_test_split(X, split_ratio, shuffle):
+    """Train valid/test set
+    Inputs:
+     - X (DataFrame): input data
+     - split_ratio (scalar)
+     - shuffle (boolean)
+    Outputs:
+     - Tuple: train, valid & test set
     """
-    mask = np.random.permutation(len(x))
-    x = x[mask]
-    if base == 'item':
-        ii = round(len(x)*train_ratio)
-        x_train = x[:ii, :]
-        x_test = x[ii:, :]
-    elif base == 'user':
-        ii = round(x.shape[1]*train_ratio)
-        x_train = x[:, :ii]
-        x_test = x[:, ii:]
+    if shuffle:
+        idx = np.random.permutation(X.shape[0])
+    else:
+        idx = X.index.tolist()
+    train_idx = int(len(idx) * split_ratio)
+    X_train = X.iloc[idx[:train_idx]]
+    X_valid = X.iloc[idx[train_idx:]].sample(frac=.5, random_state=seed)
+    X_test = X.iloc[idx[train_idx:]].drop(X_valid.index.tolist())
     
-    return x_train, x_test
-
-
-def rmse(target, pred):
-    """
-    """
-    return np.mean(np.square(target - pred)) ** .5
+    return X_train, X_valid, X_test

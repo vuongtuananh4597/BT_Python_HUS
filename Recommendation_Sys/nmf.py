@@ -26,3 +26,6 @@ class NMF(object):
     def predict(self):
         """
         """
+        
+        
+        
