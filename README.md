@@ -6,7 +6,7 @@ Features:
 * Matrix Factorization CF
     - [x] SVD linalg 
     - [x] SVD (with/without bias) 
-    - [ ] Nonnegative Matrix Factorization
+    - [x] Nonnegative Matrix Factorization
 * Deep learning
     - [ ] Deep model
     - [ ] Neural Matrix Factorization
