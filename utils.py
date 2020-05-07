@@ -1,5 +1,6 @@
 import numpy as np
 
+
 seed = 123
 np.random.seed(seed)
 def train_test_split(X, split_ratio, shuffle):
