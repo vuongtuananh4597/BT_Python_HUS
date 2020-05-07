@@ -5,9 +5,9 @@ Features:
 * Collaborative Filtering
 * Matrix Factorization CF
     - [x] SVD linalg 
-    - [x] SVD (with/without bias) 
+    - [x] funkSVD (with/without bias) includes slow and fast version
     - [x] Nonnegative Matrix Factorization
 * Deep learning
-    - [ ] Deep model
+    - [x] Deep model with Embedding layer
     - [ ] Neural Matrix Factorization
 
