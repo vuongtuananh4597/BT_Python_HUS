@@ -9,5 +9,5 @@ Features:
     - [x] Nonnegative Matrix Factorization
 * Deep learning
     - [x] Deep model with Embedding layer
-    - [ ] Neural Matrix Factorization
+    - [x] Neural Matrix Factorization
 
