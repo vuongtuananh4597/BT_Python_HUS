@@ -25,3 +25,5 @@ def train_test_split(X, split_ratio, shuffle, output_type=None):
         return X_train.values, X_valid.values, X_test.values
     elif output_type == 'df':
         return X_train, X_valid, X_test
+    
+    

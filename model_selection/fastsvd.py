@@ -128,7 +128,6 @@ class fastSVD():
         n_users = len(np.unique(X[:, 0]))
         n_items = len(np.unique(X[:, 1]))
         
-        
         pu, qi, du, bi = _init(n_users, n_items, self.K)
         for it in range(self.max_iter):
             print('Epoch {}/{}'.format(it+1, self.max_iter))
@@ -176,7 +175,6 @@ class fastSVD():
         self._run(X, X_valid)
     
         
-        
     def predict_given_id(self, userID, movieID):
         """Predict rating value given userID and movieID
         """
@@ -196,6 +194,16 @@ class fastSVD():
             pred += np.dot(self.pu[userid], self.qi[movieid])
         
         return max(0, min(5, pred))
+   
+
+    def predict_for_user(self, userID):
+        """Predict rating value for all items given userID
+        """
+        pred = {}
+        for movieID in list(self.item_dict.keys()):
+            pred[movieID] = self.predict_given_id(userID, movieID)
+            
+        return pred
 
 
     def predict(self, X):
@@ -206,3 +214,14 @@ class fastSVD():
             pred.append(self.predict_given_id(uid, iid))
         
         return pred
+    
+
+    def evaluate(self, X_valid):
+        """
+        """
+        pred_rating = np.array(self.predict(X_valid.iloc[:, :2]))
+        true_rating = X_valid.iloc[:, 2]
+        
+        return np.sqrt(np.mean((true_rating - pred_rating)**2))
+                               
+        

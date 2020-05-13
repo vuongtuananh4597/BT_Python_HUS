@@ -28,10 +28,11 @@ class DeepMF(Model):
         
         return out
     
-    def pred(self, userID, itemID):
+    def predict_given_id(self, userID, itemID):
         """Prediction given user and item ID
         """
         userID = np.array([[userID]]) - 1
         itemID = np.array([[itemID]]) - 1
         
         return self.predict([userID, itemID])[0][0]
+        

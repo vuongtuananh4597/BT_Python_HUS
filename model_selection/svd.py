@@ -13,14 +13,22 @@ class SVD(object):
      - user_based (boolean): normalization by user column or item column
      - use_biased (boolean): use biases or not
     """ 
-    def __init__(self, K, lambd=0.1, lr_rate=0.5, max_iter=1000,
-                 verbose=True, user_based=True, use_biased=None):
-        super(self, SVD).__init__()
+    def __init__(self, train, valid, K, lambd=0.1, lr_rate=0.5, max_iter=1000, Xinit=None,
+                 Winit=None, verbose=True, user_based=True, use_biased=None):
+        
+        self.raw = valid  # for evaluation
+        self.data = train  # for training
+        self.raw = self.raw.values
+        self.data = self.data.values
 
-        df = df.values
-        df[:2, :] -= 1
-        self.raw = df.copy()  # for evaluation
-        self.data = df.copy()  # for training
+        self.raw[:, :2] -= 1
+        self.data[:, :2] -= 1
+        
+        self.n_users = int(np.max(self.data[:, 0])) + 1 
+        self.n_items = int(np.max(self.data[:, 1])) + 1
+        self.n_ratings = len(self.data)
+        self.global_mean = np.mean(self.data[:, 2])
+
         self.K = K
         self.lambd = lambd
         self.lr_rate = lr_rate
@@ -28,11 +36,8 @@ class SVD(object):
         self.verbose = verbose
         self.user_based = user_based
         self.use_biased = use_biased
-
-        self.n_users = int(np.max(df[:, 0])) + 1 
-        self.n_items = int(np.max(df[:, 1])) + 1
-        self.n_ratings = len(df)
-        self.global_mean = np.mean(df[:, 2])
+        self.train_loss = []  # to keep track loss while training
+        self.train_rmse = []
 
         if Xinit is None: 
             self.X = np.random.randn(self.n_items, K)
@@ -50,9 +55,11 @@ class SVD(object):
             self.d_u = np.random.randn(self.n_users)
 
 
-    def normalization(self):
+    def _normalization(self):
         """Normalize (user or item) before training
         """
+
+
         if self.user_based:
             user_col = 0
             item_col = 1
@@ -127,22 +134,22 @@ class SVD(object):
 
                 Wm = self.W[:, user_ids]
                 dm = self.d_u[user_ids]
-                xm = self.X[m, :]
+                Xm = self.X[m, :]
             
-                error = xm.dot(Wm) + self.b[m] + dm + self.global_mean - ratings 
+                error = Xm.dot(Wm) + dm + self.b_i[m] + self.global_mean - ratings 
 
-                grad_xm = error.dot(Wm.T)/self.n_ratings + self.lambd * xm
-                grad_bm = np.sum(error)/self.n_ratings + self.lambd*self.b[m]
-                self.X[m, :] -= self.lr_rate*grad_xm.reshape((self.K,))
-                self.b_i[m] -= self.learning_rate*grad_bm
+                grad_Xm = error.dot(Wm.T)/self.n_ratings + self.lambd * Xm
+                grad_dm = np.sum(error)/self.n_ratings + self.lambd * self.b_i[m]
+                self.X[m, :] -= self.lr_rate * grad_Xm.reshape((self.K,))
+                self.b_i[m] -= self.lr_rate * grad_dm
         else:
             for m in range(self.n_items):
                 user_ids, ratings = self.get_users_who_rate_item(m)
 
                 Wm = self.W[:, user_ids]
-                grad_xm = -(ratings - self.X[m, :].dot(Wm)).dot(Wm.T)/self.n_ratings + \
+                grad_Xm = -(ratings - self.X[m, :].dot(Wm)).dot(Wm.T)/self.n_ratings + \
                                                self.lambd*self.X[m, :]
-                self.X[m, :] -= self.lr_rate*grad_xm.reshape((self.K,))
+                self.X[m, :] -= self.lr_rate*grad_Xm.reshape((self.K,))
 
 
     def updateW(self):
@@ -152,36 +159,44 @@ class SVD(object):
             for n in range(self.n_users):
                 item_ids, ratings = self.get_items_rated_by_user(n)
                 Xn = self.X[item_ids, :]
-                bn = self.b[item_ids]
-                wn = self.W[:, n]
+                bn = self.b_i[item_ids]
+                Wn = self.W[:, n]
 
-                error = Xn.dot(wn) + bn + self.global_mean + self.d[n] - ratings
-                grad_wn = Xn.T.dot(error) / self.n_ratings + self.lambd * wn
-                grad_dn = np.sum(error) / self.n_ratings + self.lambd * self.d[n]
-                self.W[:, n] -= self.lr_rate * grad_wn.reshape((self.K,))
-                self.d_u[n] -= self.lr_rate * grad_dn
+                error = Xn.dot(Wn) + bn + self.d_u[n] + self.global_mean - ratings
+
+                grad_Wn = Xn.T.dot(error) / self.n_ratings + self.lambd * Wn
+                grad_bn = np.sum(error) / self.n_ratings + self.lambd * self.d_u[n]
+                self.W[:, n] -= self.lr_rate * grad_Wn.reshape((self.K,))
+                self.d_u[n] -= self.lr_rate * grad_bn
         else:
             for n in range(self.n_users):
                 item_ids, ratings = self.get_items_rated_by_user(n)
                 Xn = self.X[item_ids, :]
 
-                grad_wn = -Xn.T.dot(ratings - Xn.dot(self.W[:, n]))/self.n_ratings + \
+                grad_Wn = -Xn.T.dot(ratings - Xn.dot(self.W[:, n]))/self.n_ratings + \
                             self.lambd * self.W[:, n]
-                self.W[:, n] -= self.lr_rate*grad_wn.reshape((self.K,))
+                self.W[:, n] -= self.lr_rate*grad_Wn.reshape((self.K,))
 
                 
     def fit(self):
         """Training phase
         """
-        self.normalization()
+        self._normalization()
+
         for it in range(self.max_iter):
             self.updateX()
             self.updateW()
             if self.verbose & ((it+1) % 10 == 0):
                 rmse_train = self.evaluate(self.raw)
+                if self.train_rmse and (abs(self.train_rmse[-1] - rmse_train) < 1e-5):
+                    print('iter =', it + 1, ', loss =', self.loss(), ', RMSE train before =', self.train_rmse[-1], ',RMSE train after =', rmse_train)
+                    print("Stop")
+                    break
+                self.train_loss.append(self.loss())
+                self.train_rmse.append(rmse_train)
                 print('iter =', it + 1, ', loss =', self.loss(), ', RMSE train =', rmse_train)
-    
-    
+
+
     def predict(self, u, i):
         """Prediction given user_id and item_id
         """
@@ -200,16 +215,15 @@ class SVD(object):
     def predict_for_user(self, user_id):
         """Prediction given user_id
         """
-        ids = np.where(self.data[:, 0] == user_id)[0]
-        items_rated_by_u = self.data[ids, 1].tolist()              
+        ids = np.where(self.data[:, 0] == (user_id - 1))[0]
+        # items_rated_by_u = self.data[ids, 1].tolist()              
         
         y_pred = self.X.dot(self.W[:, user_id])
-        predicted_ratings= []
+        pred = {}
         for i in range(self.n_items):
-            if i not in items_rated_by_u:
-                predicted_ratings.append((i, y_pred[i]))
-        
-        return predicted_ratings
+            pred[i] = y_pred[i]
+    
+        return pred
     
     def evaluate(self, test_set):
         """Evaluation (RMSE/ MSE metric)

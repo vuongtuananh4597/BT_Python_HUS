@@ -20,7 +20,7 @@ def _update(X, pu, qi, user_num, user_denom, item_num, item_denom , K, lambd_pu,
         user, item, rating = X[i, 0], X[i, 1], X[i, 2]
         pred_rating = 0
         for k in range(K):
-            pred_rating += pu[user, k] * qi[item, k]
+            pred_rating += qi[item, k] * pu[user, k]
             
         err = rating - pred_rating
 
@@ -29,7 +29,7 @@ def _update(X, pu, qi, user_num, user_denom, item_num, item_denom , K, lambd_pu,
             user_num[user, k] += qi[item, k] * rating
             user_denom[user, k] += qi[item, k] * pred_rating
             item_num[item, k] += pu[user, k] * rating
-            item_denom[item, k] += qi[item, k] *pred_rating
+            item_denom[item, k] += pu[user, k] * pred_rating
         
     # Update user factors (pu)
     for user in np.unique(X[:, 0]):
@@ -56,9 +56,9 @@ def _compute_metric(X_valid, pu, qi, K):
     for i in range(X_valid.shape[0]):
         user, item, rating = int(X_valid[i, 0]), int(X_valid[i, 1]), X_valid[i, 2]
         pred_rating = 0
-        if (user > -1) and (item > -1):
-            for k in range(K):
-                pred_rating += pu[user, k] * qi[item, k]
+        #if (user > -1) and (item > -1):
+        for k in range(K):
+            pred_rating += qi[item, k] * pu[user, k]
 
         residuals.append(rating - pred_rating)
 
@@ -109,7 +109,7 @@ class NMF(object):
         X['movieID'] = X['movieID'].map(self.item_dict)
         
         # set unknown with -1 (valid)
-        X.fillna(-1, inplace=True)
+        X.fillna(0, inplace=True)
         
         X['userID'] = X['userID'].astype(np.int32)
         X['movieID'] = X['movieID'].astype(np.int32)
@@ -144,7 +144,7 @@ class NMF(object):
                     break
 
                 self.list_losses.append(valid_rmse)
-            elif self.verbose and ((it+1) % 10 == 0):
+            elif self.verbose and ((it+1) % 5 == 0):
                 valid_loss, valid_rmse, valid_mae = _compute_metric(X_valid, pu, qi, self.K)
                 print("Valid loss: {} --- Valid RMSE: {} --- Valid MAE: {}".format(valid_loss, valid_rmse, valid_mae))
                 self.list_losses.append(valid_rmse)
@@ -170,9 +170,22 @@ class NMF(object):
     def predict_given_id(self, userID, movieID):
         """Predict rating value given userID and movieID
         """
-        pred += np.dot(self.pu[userid], self.qi[movieid])
+        user_known, item_known = False, False
+        pred = 0
+        if userID in self.user_dict:
+            user_known = True
+            userid = self.user_dict[userID]
+            pu_userid = self.pu[userid]
+
+        if movieID in self.item_dict:
+            item_known = True
+            movieid = self.item_dict[movieID]
+            qi_movieid = self.qi[movieid]
         
-        return max(0, min(5, pred))
+        if user_known & item_known:
+            pred += np.dot(qi_movieid, pu_userid)
+        
+        return pred
 
 
     def predict(self, X):
@@ -183,3 +196,22 @@ class NMF(object):
             pred.append(self.predict_given_id(uid, iid))
         
         return pred
+
+    
+    def predict_for_user(self, userID):
+        """Predict rating value for all items given userID
+        """
+        pred = {}
+        for movieID in list(self.item_dict.keys()):
+            pred[movieID] = self.predict_given_id(userID, movieID)
+            
+        return pred
+
+
+    def evaluate(self, X_valid):
+        """
+        """
+        pred_rating = np.array(self.predict(X_valid.iloc[:, :2]))
+        true_rating = X_valid.iloc[:, 2]
+        
+        return np.sqrt(np.mean((true_rating - pred_rating)**2))
